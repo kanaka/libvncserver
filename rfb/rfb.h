@@ -530,7 +530,10 @@ typedef struct _rfbClientRec {
     struct z_stream_s compStream;
     rfbBool compStreamInited;
     uint32_t zlibCompressLevel;
-    /* the quality level is also used by ZYWRLE */
+#endif
+#if defined(LIBVNCSERVER_HAVE_LIBZ) || defined(LIBVNCSERVER_HAVE_LIBPNG)
+    uint32_t tightEncoding;  /* rfbEncodingTight or rfbEncodingTightPng */
+    /* the quality level is also used by ZYWRLE and TightPng */
     int tightQualityLevel;
 
 #ifdef LIBVNCSERVER_HAVE_LIBJPEG
@@ -538,6 +541,8 @@ typedef struct _rfbClientRec {
     z_stream zsStruct[4];
     rfbBool zsActive[4];
     int zsLevel[4];
+#endif
+#if defined(LIBVNCSERVER_HAVE_LIBJPEG) || defined(LIBVNCSERVER_HAVE_LIBPNG)
     int tightCompressLevel;
 #endif
 #endif
@@ -780,7 +785,7 @@ extern rfbBool rfbSendRectEncodingUltra(rfbClientPtr cl, int x,int y,int w,int h
 extern rfbBool rfbSendRectEncodingZlib(rfbClientPtr cl, int x, int y, int w,
 				    int h);
 
-#ifdef LIBVNCSERVER_HAVE_LIBJPEG
+#if defined(LIBVNCSERVER_HAVE_LIBJPEG) || defined(LIBVNCSERVER_HAVE_LIBPNG)
 /* tight.c */
 
 #define TIGHT_DEFAULT_COMPRESSION  6
@@ -788,7 +793,13 @@ extern rfbBool rfbSendRectEncodingZlib(rfbClientPtr cl, int x, int y, int w,
 extern rfbBool rfbTightDisableGradient;
 
 extern int rfbNumCodedRectsTight(rfbClientPtr cl, int x,int y,int w,int h);
+
+#if defined(LIBVNCSERVER_HAVE_LIBJPEG)
 extern rfbBool rfbSendRectEncodingTight(rfbClientPtr cl, int x,int y,int w,int h);
+#endif
+#if defined(LIBVNCSERVER_HAVE_LIBPNG)
+extern rfbBool rfbSendRectEncodingTightPng(rfbClientPtr cl, int x,int y,int w,int h);
+#endif
 
 #endif
 #endif
