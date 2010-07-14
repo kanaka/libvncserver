@@ -518,6 +518,20 @@ typedef struct _rfbClientRec {
     char updateBuf[UPDATE_BUF_SIZE];
     int ublen;
 
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+    rfbBool webSockets;
+    rfbBool webSocketsSSL;
+    rfbBool webSocketsBase64;
+
+    char encodeBuf[UPDATE_BUF_SIZE*2 + 2]; // UTF-8 could double it + framing
+
+    char decodeBuf[8192];                  // TODO: what makes sense?
+    int dblen;
+    char carryBuf[3];                      // For base64 carry-over
+    int carrylen;
+#endif
+
+
     /* statistics */
     struct _rfbStatList *statEncList;
     struct _rfbStatList *statMsgList;
@@ -662,6 +676,7 @@ extern void rfbDisconnectUDPSock(rfbScreenInfoPtr rfbScreen);
 extern void rfbCloseClient(rfbClientPtr cl);
 extern int rfbReadExact(rfbClientPtr cl, char *buf, int len);
 extern int rfbReadExactTimeout(rfbClientPtr cl, char *buf, int len,int timeout);
+extern int rfbPeekExactTimeout(rfbClientPtr cl, char *buf, int len,int timeout);
 extern int rfbWriteExact(rfbClientPtr cl, const char *buf, int len);
 extern int rfbCheckFds(rfbScreenInfoPtr rfbScreen,long usec);
 extern int rfbConnect(rfbScreenInfoPtr rfbScreen, char* host, int port);
@@ -669,6 +684,14 @@ extern int rfbConnectToTcpAddr(char* host, int port);
 extern int rfbListenOnTCPPort(int port, in_addr_t iface);
 extern int rfbListenOnUDPPort(int port, in_addr_t iface);
 extern int rfbStringToAddr(char* string,in_addr_t* addr);
+
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+/* websockets.c */
+
+extern rfbBool webSocketsCheck(rfbClientPtr cl);
+extern int webSocketsEncode(rfbClientPtr cl, const char *src, int len);
+extern int webSocketsDecode(rfbClientPtr cl, char *dst, int len);
+#endif
 
 /* rfbserver.c */
 
