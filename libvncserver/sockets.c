@@ -449,18 +449,100 @@ rfbConnect(rfbScreenInfoPtr rfbScreen,
 int
 rfbReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
 {
+//    rfbLog(">> rfbReadExactTimeout, len: %d\n", len);
+    int sock = cl->sock;
+    int n;
+    char *end;
+    fd_set fds;
+    struct timeval tv;
+
+    while (len > 0) {
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+        if (cl->webSockets) {
+            n = webSocketsDecode(cl, buf, len);
+        } else {
+            n = read(sock, buf, len);
+        }
+#else
+        n = read(sock, buf, len);
+#endif
+
+        if (n > 0) {
+
+            buf += n;
+            len -= n;
+
+        } else if (n == 0) {
+
+            return 0;
+
+        } else {
+#ifdef WIN32
+	    errno = WSAGetLastError();
+#endif
+	    if (errno == EINTR)
+		continue;
+
+#ifdef LIBVNCSERVER_ENOENT_WORKAROUND
+	    if (errno != ENOENT)
+#endif
+            if (errno != EWOULDBLOCK && errno != EAGAIN) {
+                return n;
+            }
+
+            FD_ZERO(&fds);
+            FD_SET(sock, &fds);
+            tv.tv_sec = timeout / 1000;
+            tv.tv_usec = (timeout % 1000) * 1000;
+            n = select(sock+1, &fds, NULL, &fds, &tv);
+            if (n < 0) {
+                rfbLogPerror("ReadExact: select");
+                return n;
+            }
+            if (n == 0) {
+                errno = ETIMEDOUT;
+                return -1;
+            }
+        }
+    }
+
+#undef DEBUG_READ_EXACT
+#ifdef DEBUG_READ_EXACT
+    rfbLog("ReadExact %d bytes\n",len);
+    for(n=0;n<len;n++)
+	    fprintf(stderr,"%02x ",(unsigned char)buf[n]);
+    fprintf(stderr,"\n");
+#endif
+
+//    rfbLog("<< rfbReadExactTimeout\n");
+    return 1;
+}
+
+int rfbReadExact(rfbClientPtr cl,char* buf,int len)
+{
+  return(rfbReadExactTimeout(cl,buf,len,rfbMaxClientWait));
+}
+
+/*
+ * PeekExact peeks at an exact number of bytes from a client.  Returns 1 if
+ * those bytes have been read, 0 if the other end has closed, or -1 if an
+ * error occurred (errno is set to ETIMEDOUT if it timed out).
+ */
+
+int
+rfbPeekExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
+{
     int sock = cl->sock;
     int n;
     fd_set fds;
     struct timeval tv;
 
     while (len > 0) {
-        n = read(sock, buf, len);
+        n = recv(sock, buf, len, MSG_PEEK);
 
-        if (n > 0) {
+        if (n == len) {
 
-            buf += n;
-            len -= n;
+            break;
 
         } else if (n == 0) {
 
@@ -506,11 +588,6 @@ rfbReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
     return 1;
 }
 
-int rfbReadExact(rfbClientPtr cl,char* buf,int len)
-{
-  return(rfbReadExactTimeout(cl,buf,len,rfbMaxClientWait));
-}
-
 /*
  * WriteExact writes an exact number of bytes to a client.  Returns 1 if
  * those bytes have been written, or -1 if an error occurred (errno is set to
@@ -522,6 +599,7 @@ rfbWriteExact(rfbClientPtr cl,
               const char *buf,
               int len)
 {
+//    rfbLog(">> rfbWriteExact, len: %d\n", len);
     int sock = cl->sock;
     int n;
     fd_set fds;
@@ -534,6 +612,16 @@ rfbWriteExact(rfbClientPtr cl,
     for(n=0;n<len;n++)
 	    fprintf(stderr,"%02x ",(unsigned char)buf[n]);
     fprintf(stderr,"\n");
+#endif
+
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+    if (cl->webSockets) {
+        if ((len = webSocketsEncode(cl, buf, len)) < 0) {
+            rfbErr("WriteExact: WebSockets encode error\n");
+            return -1;
+        }
+        buf = cl->encodeBuf;
+    }
 #endif
 
     LOCK(cl->outputMutex);
@@ -591,6 +679,7 @@ rfbWriteExact(rfbClientPtr cl,
         }
     }
     UNLOCK(cl->outputMutex);
+//    rfbLog("<< rfbWriteExact, len: %d\n", len);
     return 1;
 }
 
