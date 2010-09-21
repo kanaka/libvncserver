@@ -3008,12 +3008,12 @@ if (db) fprintf(stderr, "check_xrecord: BUTTON-UP-KEEP-GOING:  %.3f/%.3f %d/%d %
 	pointer_queued_sent = 0;
 	last_x = cursor_x;
 	last_y = cursor_y;
-	pointer(-1, 0, 0, NULL);
+	do_pointer(-1, 0, 0, NULL);
 	pointer_flush_delay = 0.0;
 
 	if (xrecording && pointer_queued_sent && button_mask_save &&
 	    (last_x != cursor_x || last_y != cursor_y) ) {
-if (db) fprintf(stderr, "  pointer() push yields events on: ret=%d\n", ret);
+if (db) fprintf(stderr, "  do_pointer() push yields events on: ret=%d\n", ret);
 		if (ret == 2) {
 if (db) fprintf(stderr, "  we decide to send ret=3\n");
 			want_back_in = 1;
@@ -4509,7 +4509,7 @@ if (db) fprintf(stderr, "INTERIOR\n");
 	}
 
 	/*
-	 * pointer() should have snapped the stacking list for us, if
+	 * do_pointer() should have snapped the stacking list for us, if
 	 * not, do it now (if the XFakeButtonEvent has been flushed by
 	 * now the stacking order may be incorrect).
 	 */
@@ -4565,7 +4565,7 @@ if (db) fprintf(stderr, "INTERIOR\n");
 	/* -threads support for check_wireframe() is rough... crash? */
 	if (use_threads) {
 		/* purge any stored up pointer events: */
-		pointer(-1, 0, 0, NULL);
+		do_pointer(-1, 0, 0, NULL);
 	}
 
 	if (cursor_noshape_updates_clients(screen)) {

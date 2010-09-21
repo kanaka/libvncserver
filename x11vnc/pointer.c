@@ -54,7 +54,7 @@ int pointer_queued_sent = 0;
 
 void initialize_pointer_map(char *pointer_remap);
 void do_button_mask_change(int mask, int button);
-void pointer(int mask, int x, int y, rfbClientPtr client);
+void do_pointer(int mask, int x, int y, rfbClientPtr client);
 void initialize_pipeinput(void);
 int check_pipeinput(void);
 void update_x11_pointer_position(int x, int y);
@@ -417,7 +417,7 @@ void do_button_mask_change(int mask, int button) {
 				continue;
 			}
 			if (debug_pointer) {
-				rfbLog("pointer(): sending button %d"
+				rfbLog("do_pointer(): sending button %d"
 				    " %s (event %d)\n", mb, bmask
 				    ? "down" : "up", k+1);
 			}
@@ -436,7 +436,7 @@ void do_button_mask_change(int mask, int button) {
 			if (debug_pointer && dpy) {
 				char *str = XKeysymToString(XKeycodeToKeysym(
                                     dpy, key, 0));
-				rfbLog("pointer(): sending button %d "
+				rfbLog("do_pointer(): sending button %d "
 				    "down as keycode 0x%x (event %d)\n",
 				    i+1, key, k+1);
 				rfbLog("           down=%d up=%d keysym: "
@@ -569,7 +569,7 @@ if (debug_scroll > 1) fprintf(stderr, "internal scrollbar: %dx%d\n", w, h);
 	for (i=0; i < MAX_BUTTONS; i++) {
 	    if ( (button_mask & (1<<i)) != (mask & (1<<i)) ) {
 		if (debug_pointer) {
-			rfbLog("pointer(): mask change: mask: 0x%x -> "
+			rfbLog("do_pointer(): mask change: mask: 0x%x -> "
 			    "0x%x button: %d\n", button_mask, mask,i+1);
 		}
 		do_button_mask_change(mask, i+1);	/* button # is i+1 */
@@ -668,7 +668,7 @@ static void pipe_pointer(int mask, int x, int y, rfbClientPtr client) {
  * This may queue pointer events rather than sending them immediately
  * to the X server. (see update_x11_pointer*())
  */
-void pointer(int mask, int x, int y, rfbClientPtr client) {
+void do_pointer(int mask, int x, int y, rfbClientPtr client) {
 	allowed_input_t input;
 	int sent = 0, buffer_it = 0;
 	double now;
@@ -698,7 +698,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 		dt = tnow - last_pointer;
 		last_pointer = tnow;
 		if (show_motion) {
-			rfbLog("# pointer(mask: 0x%x, x:%4d, y:%4d) "
+			rfbLog("# do_pointer(mask: 0x%x, x:%4d, y:%4d) "
 			    "dx: %3d dy: %3d dt: %.4f t: %.4f\n", mask, x, y,
 			    x - last_x, y - last_y, dt, tnow);
 		}
@@ -789,7 +789,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 			}
 			if (! ok) {
 				if (debug_pointer) {
-				    rfbLog("pointer(): blackout_ptr skipping "
+				    rfbLog("do_pointer(): blackout_ptr skipping "
 					"x=%d y=%d in rectangle %d,%d %d,%d\n", x, y,
 					blackr[b].x1, blackr[b].y1,
 					blackr[b].x2, blackr[b].y2);
@@ -860,7 +860,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 					ev[i][2] = -1;
 				}
 				if (debug_pointer) {
-					rfbLog("pointer(): deferring event %d"
+					rfbLog("do_pointer(): deferring event %d"
 					    " %.4f\n", i, tmr - x11vnc_start);
 				}
 				POINTER_UNLOCK;
@@ -883,7 +883,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 				}
 			}
 			if (debug_pointer) {
-				rfbLog("pointer(): sending event %d %.4f\n",
+				rfbLog("do_pointer(): sending event %d %.4f\n",
 				    i+1, dnowx());
 			}
 			if (ev[i][1] >= 0) {
@@ -903,7 +903,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 		    if (dpy) {	/* raw_fb hack */
 			if (mask < 0) {
 				if (debug_pointer) {
-					rfbLog("pointer(): calling XFlush "
+					rfbLog("do_pointer(): calling XFlush "
 					    "%.4f\n", dnowx());
 				}
 				X_LOCK;
@@ -920,7 +920,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 	}
 	if (mask < 0) {		/* -1 just means flush the event queue */
 		if (debug_pointer) {
-			rfbLog("pointer(): flush only.  %.4f\n",
+			rfbLog("do_pointer(): flush only.  %.4f\n",
 			    dnowx());
 		}
 		INPUT_UNLOCK;
@@ -953,7 +953,7 @@ void pointer(int mask, int x, int y, rfbClientPtr client) {
 		X_UNLOCK;
 	} else if (buffer_it) {
 		if (debug_pointer) {
-			rfbLog("pointer(): calling XFlush+"
+			rfbLog("do_pointer(): calling XFlush+"
 			    "%.4f\n", dnowx());
 		}
 		X_LOCK;

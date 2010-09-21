@@ -3149,7 +3149,7 @@ static void pmove(int x, int y) {
 		return;
 	}
 	rfbLog("pmove: x y: %d %d\n", x, y);
-	pointer(0, x, y, NULL);
+	do_pointer(0, x, y, NULL);
 	X_LOCK;
 	XFlush_wr(dpy);
 	X_UNLOCK;

@@ -2898,9 +2898,9 @@ static void pipe_keyboard(rfbBool down, rfbKeySym keysym, rfbClientPtr client) {
 			t[1] = '\0';
 			if (sscanf(t, "%d", &butt) == 1) {
 				mask = 1<<(butt-1);
-				pointer(mask, x, y, client);
+				do_pointer(mask, x, y, client);
 				mask = 0;
-				pointer(mask, x, y, client);
+				do_pointer(mask, x, y, client);
 			}
 			b++;
 		}

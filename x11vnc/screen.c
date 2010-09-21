@@ -3538,7 +3538,7 @@ void initialize_screen(int *argc, char **argv, XImage *fb) {
 	/* event callbacks: */
 	screen->newClientHook = new_client;
 	screen->kbdAddEvent = keyboard;
-	screen->ptrAddEvent = pointer;
+	screen->ptrAddEvent = do_pointer;
 	screen->setXCutText = xcut_receive;
 	screen->setTranslateFunction = set_xlate_wrapper;
 
