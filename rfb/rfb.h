@@ -360,6 +360,10 @@ typedef struct _rfbScreenInfo
 
     /* displayFinishedHook is called just after a frame buffer update */
     rfbDisplayFinishedHookPtr displayFinishedHook;
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+    char *sslkeyfile;
+    char *sslcertfile;
+#endif
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 

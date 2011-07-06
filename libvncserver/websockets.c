@@ -69,19 +69,27 @@ min (int a, int b) {
 int
 webSocketsSSLInit(rfbClientPtr cl)
 {
-    char *keyfile = "self.pem";
+    char *keyfile;
     int r, ret = -1;
 
     SSL_library_init();
     OpenSSL_add_all_algorithms();
     SSL_load_error_strings();
 
-    if (NULL == (cl->ssl_ctx = SSL_CTX_new(TLSv1_server_method()))) {
+    if (cl->screen->sslkeyfile && *cl->screen->sslkeyfile) {
+      keyfile = cl->screen->sslkeyfile;
+    } else {
+      keyfile = cl->screen->sslcertfile;
+    }
+
+    if (!cl->screen->sslcertfile || !cl->screen->sslcertfile[0]) {
+	rfbErr("SSL connection but no cert specified\n");
+    } else if (NULL == (cl->ssl_ctx = SSL_CTX_new(TLSv1_server_method()))) {
 	ERR_print_errors_fp(stderr);
     } else if (SSL_CTX_use_PrivateKey_file(cl->ssl_ctx, keyfile, SSL_FILETYPE_PEM) <= 0) {
 	rfbErr("Unable to load private key file %s\n", keyfile);
-    } else if (SSL_CTX_use_certificate_file(cl->ssl_ctx, keyfile, SSL_FILETYPE_PEM) <= 0) {
-	rfbErr("Unable to load certificate file %s\n", keyfile);
+    } else if (SSL_CTX_use_certificate_file(cl->ssl_ctx, cl->screen->sslcertfile, SSL_FILETYPE_PEM) <= 0) {
+	rfbErr("Unable to load certificate file %s\n", cl->screen->sslcertfile);
     } else if (NULL == (cl->ssl = SSL_new(cl->ssl_ctx))) {
 	rfbErr("SSL_new failed\n");
 	ERR_print_errors_fp(stderr);
