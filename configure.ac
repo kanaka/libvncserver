@@ -307,6 +307,56 @@ elif test "x$uname_s" = "xDarwin"; then
 	ld_minus_R="no"
 fi
 
+if test "x$with_v4l" != "xno"; then
+	AC_CHECK_HEADER(linux/videodev.h,
+		[AC_DEFINE(HAVE_LINUX_VIDEODEV_H)],,)
+fi
+if test "x$with_fbdev" != "xno"; then
+	AC_CHECK_HEADER(linux/fb.h,
+		[AC_DEFINE(HAVE_LINUX_FB_H)],,)
+fi
+if test "x$with_uinput" != "xno"; then
+	AC_CHECK_HEADER(linux/input.h,
+		[AC_DEFINE(HAVE_LINUX_INPUT_H) HAVE_LINUX_INPUT_H="true"],,)
+	if test "x$HAVE_LINUX_INPUT_H" = "xtrue"; then
+		AC_CHECK_HEADER(linux/uinput.h,
+			[AC_DEFINE(HAVE_LINUX_UINPUT_H)],, [#include <linux/input.h>])
+	fi
+fi
+
+if test "x$with_macosx_native" != "xno"; then
+	AC_DEFINE(HAVE_MACOSX_NATIVE_DISPLAY)
+fi
+
+AH_TEMPLATE(HAVE_AVAHI, [Avahi/mDNS client build environment present])
+AC_ARG_WITH(avahi,
+[  --without-avahi         disable support for Avahi/mDNS]
+[  --with-avahi=DIR        use avahi include/library files in DIR],,)
+if test "x$with_avahi" != "xno"; then
+	printf "checking for avahi... "
+	if test ! -z "$with_avahi" -a "x$with_avahi" != "xyes"; then
+		AVAHI_CFLAGS="-I$with_avahi/include"
+		AVAHI_LIBS="-L$with_avahi/lib -lavahi-common -lavahi-client"
+		echo "using $with_avahi"
+		with_avahi=yes
+	elif pkg-config --atleast-version=0.6.4 avahi-client >/dev/null 2>&1; then
+		AVAHI_CFLAGS=`pkg-config --cflags avahi-client`
+		AVAHI_LIBS=`pkg-config --libs avahi-client`
+		with_avahi=yes
+		echo yes
+	else
+		with_avahi=no
+		echo no
+	fi
+fi
+if test "x$with_avahi" = "xyes"; then
+	AC_DEFINE(HAVE_AVAHI)
+	AC_SUBST(AVAHI_CFLAGS)
+	AC_SUBST(AVAHI_LIBS)
+fi
+
+fi
+# end x11vnc only.
 
 
 AH_TEMPLATE(HAVE_LIBCRYPT, [libcrypt library present])
@@ -387,56 +437,6 @@ something like libssl-dev) and run configure again.
 			)
 	fi
 
-if test "x$with_v4l" != "xno"; then
-	AC_CHECK_HEADER(linux/videodev.h,
-		[AC_DEFINE(HAVE_LINUX_VIDEODEV_H)],,)
-fi
-if test "x$with_fbdev" != "xno"; then
-	AC_CHECK_HEADER(linux/fb.h,
-		[AC_DEFINE(HAVE_LINUX_FB_H)],,)
-fi
-if test "x$with_uinput" != "xno"; then
-	AC_CHECK_HEADER(linux/input.h,
-		[AC_DEFINE(HAVE_LINUX_INPUT_H) HAVE_LINUX_INPUT_H="true"],,)
-	if test "x$HAVE_LINUX_INPUT_H" = "xtrue"; then
-		AC_CHECK_HEADER(linux/uinput.h,
-			[AC_DEFINE(HAVE_LINUX_UINPUT_H)],, [#include <linux/input.h>])
-	fi
-fi
-
-if test "x$with_macosx_native" != "xno"; then
-	AC_DEFINE(HAVE_MACOSX_NATIVE_DISPLAY)
-fi
-
-AH_TEMPLATE(HAVE_AVAHI, [Avahi/mDNS client build environment present])
-AC_ARG_WITH(avahi,
-[  --without-avahi         disable support for Avahi/mDNS]
-[  --with-avahi=DIR        use avahi include/library files in DIR],,)
-if test "x$with_avahi" != "xno"; then
-	printf "checking for avahi... "
-	if test ! -z "$with_avahi" -a "x$with_avahi" != "xyes"; then
-		AVAHI_CFLAGS="-I$with_avahi/include"
-		AVAHI_LIBS="-L$with_avahi/lib -lavahi-common -lavahi-client"
-		echo "using $with_avahi"
-		with_avahi=yes
-	elif pkg-config --atleast-version=0.6.4 avahi-client >/dev/null 2>&1; then
-		AVAHI_CFLAGS=`pkg-config --cflags avahi-client`
-		AVAHI_LIBS=`pkg-config --libs avahi-client`
-		with_avahi=yes
-		echo yes
-	else
-		with_avahi=no
-		echo no
-	fi
-fi
-if test "x$with_avahi" = "xyes"; then
-	AC_DEFINE(HAVE_AVAHI)
-	AC_SUBST(AVAHI_CFLAGS)
-	AC_SUBST(AVAHI_LIBS)
-fi
-
-fi
-# end x11vnc only.
 
 # Checks for libraries.
 
