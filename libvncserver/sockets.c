@@ -387,6 +387,14 @@ rfbCloseClient(rfbClientPtr cl)
 	  while(cl->screen->maxFd>0
 		&& !FD_ISSET(cl->screen->maxFd,&(cl->screen->allFds)))
 	    cl->screen->maxFd--;
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+	if (cl->ssl) {
+	    SSL_free(cl->ssl);
+	}
+	if (cl->ssl_ctx) {
+	    SSL_CTX_free(cl->ssl_ctx);
+	}
+#endif
 #ifndef __MINGW32__
 	shutdown(cl->sock,SHUT_RDWR);
 #endif
@@ -460,7 +468,9 @@ rfbReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
         if (cl->webSockets) {
             n = webSocketsDecode(cl, buf, len);
-        } else {
+        } else if (cl->ssl) {
+	    n = SSL_read(cl->ssl, buf, len);
+	} else {
             n = read(sock, buf, len);
         }
 #else
@@ -490,6 +500,12 @@ rfbReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
                 return n;
             }
 
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+	    if (cl->ssl) {
+		if (SSL_pending(cl->ssl))
+		    continue;
+	    }
+#endif
             FD_ZERO(&fds);
             FD_SET(sock, &fds);
             tv.tv_sec = timeout / 1000;
@@ -538,7 +554,10 @@ rfbPeekExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
     struct timeval tv;
 
     while (len > 0) {
-        n = recv(sock, buf, len, MSG_PEEK);
+        if (cl->ssl)
+	    n = SSL_peek(cl->ssl, buf, len);
+	else
+	    n = recv(sock, buf, len, MSG_PEEK);
 
         if (n == len) {
 
@@ -626,7 +645,11 @@ rfbWriteExact(rfbClientPtr cl,
 
     LOCK(cl->outputMutex);
     while (len > 0) {
-        n = write(sock, buf, len);
+        if (cl->ssl) {
+	    n = SSL_write(cl->ssl, buf, len);
+	} else {
+	    n = write(sock, buf, len);
+	}
 
         if (n > 0) {
 

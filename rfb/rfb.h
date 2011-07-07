@@ -48,6 +48,10 @@ extern "C"
 #include <winsock2.h>
 #endif
 
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+#include <openssl/ssl.h>
+#endif
+
 #ifdef LIBVNCSERVER_HAVE_LIBPTHREAD
 #include <pthread.h>
 #if 0 /* debugging */
@@ -356,6 +360,10 @@ typedef struct _rfbScreenInfo
 
     /* displayFinishedHook is called just after a frame buffer update */
     rfbDisplayFinishedHookPtr displayFinishedHook;
+#ifdef LIBVNCSERVER_WITH_WEBSOCKETS
+    char *sslkeyfile;
+    char *sslcertfile;
+#endif
 } rfbScreenInfo, *rfbScreenInfoPtr;
 
 
@@ -523,8 +531,12 @@ typedef struct _rfbClientRec {
     rfbBool webSocketsSSL;
     rfbBool webSocketsBase64;
 
-    char encodeBuf[UPDATE_BUF_SIZE*2 + 2]; // UTF-8 could double it + framing
+    SSL_CTX *ssl_ctx;
+    SSL     *ssl;
 
+    char *keyfile;
+    char *certfile;
+    char encodeBuf[UPDATE_BUF_SIZE*2 + 2]; // UTF-8 could double it + framing
     char decodeBuf[8192];                  // TODO: what makes sense?
     int dblen;
     char carryBuf[3];                      // For base64 carry-over

@@ -32,6 +32,8 @@
 #include <errno.h>
 
 #include <md5.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 
 #define FLASH_POLICY_RESPONSE "<cross-domain-policy><allow-access-from domain=\"*\" to-ports=\"*\" /></cross-domain-policy>\n"
 #define SZ_FLASH_POLICY_RESPONSE 93
@@ -64,6 +66,51 @@ min (int a, int b) {
     return a < b ? a : b;
 }
 
+int
+webSocketsSSLInit(rfbClientPtr cl)
+{
+    char *keyfile;
+    int r, ret = -1;
+
+    SSL_library_init();
+    OpenSSL_add_all_algorithms();
+    SSL_load_error_strings();
+
+    if (cl->screen->sslkeyfile && *cl->screen->sslkeyfile) {
+      keyfile = cl->screen->sslkeyfile;
+    } else {
+      keyfile = cl->screen->sslcertfile;
+    }
+
+    if (!cl->screen->sslcertfile || !cl->screen->sslcertfile[0]) {
+	rfbErr("SSL connection but no cert specified\n");
+    } else if (NULL == (cl->ssl_ctx = SSL_CTX_new(TLSv1_server_method()))) {
+	ERR_print_errors_fp(stderr);
+    } else if (SSL_CTX_use_PrivateKey_file(cl->ssl_ctx, keyfile, SSL_FILETYPE_PEM) <= 0) {
+	rfbErr("Unable to load private key file %s\n", keyfile);
+    } else if (SSL_CTX_use_certificate_file(cl->ssl_ctx, cl->screen->sslcertfile, SSL_FILETYPE_PEM) <= 0) {
+	rfbErr("Unable to load certificate file %s\n", cl->screen->sslcertfile);
+    } else if (NULL == (cl->ssl = SSL_new(cl->ssl_ctx))) {
+	rfbErr("SSL_new failed\n");
+	ERR_print_errors_fp(stderr);
+    } else if (!(SSL_set_fd(cl->ssl, cl->sock))) {
+	rfbErr("SSL_set_fd failed\n");
+	ERR_print_errors_fp(stderr);
+    } else {
+	while ((r = SSL_accept(cl->ssl)) < 0) {
+	    if (SSL_get_error(cl->ssl, r) != SSL_ERROR_WANT_READ)
+		break;
+	}
+	if (r < 0) {
+	    rfbErr("SSL_accept failed %d\n", SSL_get_error(cl->ssl, r));
+	} else {
+	    ret = 0;
+	}
+    }
+    return ret;
+}
+
+
 /*
  * rfbWebSocketsHandshake is called to handle new WebSockets connections
  */
@@ -91,13 +138,15 @@ webSocketsCheck (rfbClientPtr cl)
             rfbErr("webSocketsHandshake: failed sending Flash policy response");
         }
         return FALSE;
-    } else if (strncmp(bbuf, "\x16", 1) == 0) {
-        cl->webSocketsSSL = TRUE;
+    } else if (strncmp(bbuf, "\x16", 1) == 0 || strncmp(bbuf, "\x80", 1) == 0) {
         rfbLog("Got TLS/SSL WebSockets connection\n");
+        if (-1 == webSocketsSSLInit(cl)) {
+	  rfbErr("webSocketsHandshake: webSocketsSSLInit failed\n");
+	  return FALSE;
+	}
+	ret = rfbPeekExactTimeout(cl, bbuf, 4, WEBSOCKETS_CLIENT_CONNECT_WAIT_MS);
+        cl->webSocketsSSL = TRUE;
         scheme = "wss";
-        // TODO
-        // bbuf = ...
-        return FALSE;
     } else {
         cl->webSocketsSSL = FALSE;
         scheme = "ws";
@@ -334,6 +383,36 @@ webSocketsEncode(rfbClientPtr cl, const char *src, int len)
     return sz;
 }
 
+static int
+ws_read(rfbClientPtr cl, char *buf, int len)
+{
+    int n;
+    if (cl->ssl) {
+	while ((n = SSL_read(cl->ssl, buf, len)) <= 0) {
+	    if (SSL_get_error(cl->ssl, n) != SSL_ERROR_WANT_READ)
+		return -1;
+	}
+    } else {
+	n = read(cl->sock, buf, len);
+    }
+    return n;
+}
+
+static int
+ws_peek(rfbClientPtr cl, char *buf, int len)
+{
+    int total = 0, n;
+    if (cl->ssl) {
+	while ((n = SSL_peek(cl->ssl, buf, len)) <= 0) {
+	    if (SSL_get_error(cl->ssl, n) != SSL_ERROR_WANT_READ)
+		return -1;
+	}
+    } else {
+	n = recv(cl->sock, buf, len, MSG_PEEK);
+    }
+    return n;
+}
+
 int
 webSocketsDecode(rfbClientPtr cl, char *dst, int len)
 {
@@ -345,7 +424,7 @@ webSocketsDecode(rfbClientPtr cl, char *dst, int len)
 
     buf = cl->decodeBuf;
 
-    n = recv(cl->sock, buf, len*2+2, MSG_PEEK);
+    n = ws_peek(cl, buf, len*2+2);
 
     if (n <= 0) {
         rfbLog("recv of %d\n", n);
@@ -357,7 +436,7 @@ webSocketsDecode(rfbClientPtr cl, char *dst, int len)
         /* Base64 encoded WebSockets stream */
 
         if (buf[0] == '\xff') {
-            i = read(cl->sock, buf, 1); // Consume marker
+            i = ws_read(cl, buf, 1); // Consume marker
             buf++;
             n--;
         }
@@ -366,7 +445,7 @@ webSocketsDecode(rfbClientPtr cl, char *dst, int len)
             return -1;
         }
         if (buf[0] == '\x00') {
-            i = read(cl->sock, buf, 1); // Consume marker
+            i = ws_read(cl, buf, 1); // Consume marker
             buf++;
             n--;
         }
@@ -416,7 +495,7 @@ webSocketsDecode(rfbClientPtr cl, char *dst, int len)
         retlen += n;
 
         /* Consume the data from socket */
-        i = read(cl->sock, buf, needlen);
+        i = ws_read(cl, buf, needlen);
 
         cl->carrylen = n - len;
         retlen -= cl->carrylen;
@@ -447,7 +526,7 @@ webSocketsDecode(rfbClientPtr cl, char *dst, int len)
         }
 
         /* Consume what we need */
-        if ((n = read(cl->sock, buf, needlen)) < needlen) {
+        if ((n = ws_read(cl, buf, needlen)) < needlen) {
             return n;
         }
 

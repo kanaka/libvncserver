@@ -1820,14 +1820,22 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 
 #ifdef LIBVNCSERVER_WITH_WEBSOCKETS
     if (cl->webSockets) {
-        n = recv(cl->sock, encBuf, 4, MSG_PEEK);
-        if (cl->webSocketsBase64) {
+
+	if (cl->ssl)
+	    n = SSL_peek(cl->ssl, encBuf, 4);
+	else
+	    n = recv(cl->sock, encBuf, 4, MSG_PEEK);
+
+	if (cl->webSocketsBase64) {
             /* With Base64 encoding we need at least 4 bytes */
             if ((n > 0) && (n < 4)) {
                 if (encBuf[0] == '\xff') {
                     /* Make sure we don't miss a client disconnect on an end frame
                     * marker */
-                    n = read(cl->sock, encBuf, 1);
+		    if (cl->ssl)
+			    n = SSL_read(cl->ssl, encBuf, 1);
+		    else
+			    n = read(cl->sock, encBuf, 1);
                 }
                 return;
             }
@@ -1837,7 +1845,10 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
                 if (encBuf[0] == '\xff') {
                     /* Make sure we don't miss a client disconnect on an end frame
                     * marker */
-                    n = read(cl->sock, encBuf, 1);
+		    if (cl->ssl)
+			    n = SSL_read(cl->ssl, encBuf, 1);
+		    else
+			    n = read(cl->sock, encBuf, 1);
                 }
                 return;
             }
