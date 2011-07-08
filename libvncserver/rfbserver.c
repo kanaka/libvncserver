@@ -1837,7 +1837,8 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 		    else
 			    n = read(cl->sock, encBuf, 1);
                 }
-                return;
+		if (encBuf[0] != '\x00')
+		    return;
             }
         } else {
             /* With UTF-8 encoding we need at least 3 bytes (framing + 1) */
@@ -1850,7 +1851,8 @@ rfbProcessClientNormalMessage(rfbClientPtr cl)
 		    else
 			    n = read(cl->sock, encBuf, 1);
                 }
-                return;
+		if (encBuf[0] != '\x00')
+		    return;
             }
         }
     }
