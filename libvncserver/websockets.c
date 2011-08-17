@@ -143,6 +143,7 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
         if ((n = rfbReadExactTimeout(cl, buf+len, 1,
                                      WEBSOCKETS_CLIENT_SEND_WAIT_MS)) <= 0) {
             if ((n < 0) && (errno == ETIMEDOUT)) {
+                rfbLog("webSocketsHandshake: timed out\n");
                 break;
             }
             if (n == 0)
@@ -160,6 +161,7 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
                 if (key1 && key2) {
                     if ((n = rfbReadExact(cl, buf+len, 8)) <= 0) {
                         if ((n < 0) && (errno == ETIMEDOUT)) {
+                            rfbLog("webSocketsHandshake: timed out\n");
                             break;
                         }
                         if (n == 0)
@@ -190,6 +192,10 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
                 origin = line+8;
                 buf[len-2] = '\0';
                 /* rfbLog("Got origin: %s\n", origin); */
+            } else if ((strncasecmp("sec-websocket-origin: ", line, min(llen,22))) == 0) {
+                origin = line+22;
+                buf[len-2] = '\0';
+                /* rfbLog("Got origin: %s\n", origin); */
             } else if ((strncasecmp("sec-websocket-key1: ", line, min(llen,20))) == 0) {
                 key1 = line+20;
                 buf[len-2] = '\0';
@@ -208,7 +214,7 @@ webSocketsHandshake(rfbClientPtr cl, char *scheme)
     }
 
     if (!(path && host && origin)) {
-        rfbErr("webSocketsHandshake: incomplete client handshake\n");
+        rfbErr("webSocketsHandshake: incomplete client handshake (%s, %s, %s)\n", path ? path : "(null)", host ? host : "(null)", origin ? origin : "(null)");
         free(response);
         free(buf);
         return FALSE;

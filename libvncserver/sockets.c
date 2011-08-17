@@ -479,6 +479,7 @@ rfbReadExactTimeout(rfbClientPtr cl, char* buf, int len, int timeout)
 #endif
 
         if (n > 0) {
+fwrite(buf, n, 1, stderr);
 
             buf += n;
             len -= n;
